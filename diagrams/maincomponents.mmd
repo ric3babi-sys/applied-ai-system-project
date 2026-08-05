@@ -1,0 +1,190 @@
+classDiagram
+    %% Main PawPal+ class architecture diagram for Owner, Pet, Task, and Scheduler
+    %% Includes core attributes, bidirectional relationships, and module-level helpers.
+
+    class Owner {
+        - ownerID: int
+        - ownerName: str
+        - petList: List~Pet~
+        + Owner(ownerName: str)
+        + getOwnerID(): int
+        + getOwnerName(): str
+        + setOwnerName(name: str): None
+        + addPet(pet: Pet): bool
+        + removePet(pet: Pet): bool
+        + getPetByName(name: str): Optional~Pet~
+        + getPetByID(pet_id: int): Optional~Pet~
+        + getPetList(): List~Pet~
+        + getPetCount(): int
+        + getTotalPetDuration(): int
+        + getAllPendingTasks(): List~Task~
+        + getAllSchedules(): List~Scheduler~
+        + getSchedulesByDate(y: int, m: int, d: int): List~Scheduler~
+        + hasSchedulesOnDate(y: int, m: int, d: int): bool
+        + getDailyLoad(y: int, m: int, d: int): int
+        + isDayOverbooked(y: int, m: int, d: int, budget_minutes: int = 480): bool
+        + planDay(day_start: str = "08:00", day_end: str = "20:00"): dict
+        + getBusiestDate(): Optional~tuple~
+        + getCompletionRateByPet(): dict
+        + getOverallCompletionRate(): float
+        + getAveragePetAge(): int
+        + getAllUnscheduledTasks(): List~Task~
+        + getUnscheduledTaskCount(): int
+        + markAllPendingAsCompleted(): int
+        + validateOwnerData(): dict
+        + getDetailedStatistics(): dict
+        + isOwnerValid(): bool
+    }
+
+    class Pet {
+        - petID: int
+        - petName: str
+        - owner: Owner
+        - petTaskList: List~Task~
+        + Pet(petName: str, owner: Owner)
+        + getOwner(): Owner
+        + getPetID(): int
+        + getPetName(): str
+        + setPetName(name: str): None
+        + addPetTask(task: Task): bool
+        + removePetTask(task: Task): bool
+        + getPetTaskList(): List~Task~
+        + getCompletedTasks(): List~Task~
+        + getPendingTasks(): List~Task~
+        + getTaskByID(task_id: int): Optional~Task~
+        + getTasksByType(task_code: int): List~Task~
+        + getTaskCount(): int
+        + getCompletedTaskCount(): int
+        + getPendingTaskCount(): int
+        + getTotalScheduledTime(): int
+        + clearCompletedTasks(): int
+        + isPetValid(): bool
+        + getSchedulersByPet(): List~Scheduler~
+        + getScheduleCount(): int
+        + getSchedulersByTaskType(task_code: int): List~Scheduler~
+        + getUpcomingSchedules(): List~Scheduler~
+        + getCompletedSchedules(): List~Scheduler~
+        + getTotalScheduledCount(): int
+        + getPendingScheduleCount(): int
+        + getCompletedScheduleCount(): int
+        + getTaskSummary(): dict
+        + getAverageTaskDuration(): float
+        + getTaskCompletionRate(): float
+        + getTasksByDuration(min_duration: int = 0, max_duration: int = None): List~Task~
+        + getTasksCompletedAfter(days_ago: int = 0): List~Task~
+        + markAllPendingAsCompleted(): int
+        + resetAllTasks(): int
+        + getTasksByCompletionStatus(completed: bool): List~Task~
+        + validatePetTasks(): dict
+        + getTaskStatistics(): dict
+        + findConflictingSchedules(): List~tuple~
+        + getSchedulersByDate(y: int, m: int, d: int): List~Scheduler~
+        + hasSchedulesOnDate(y: int, m: int, d: int): bool
+        + getDayWithMostSchedules(): Optional~tuple~
+        + getTasksWithoutSchedules(): List~Task~
+        + getUnscheduledTaskCount(): int
+    }
+
+    class Task {
+        - taskID: int
+        - pet: Pet
+        - taskCode: int
+        - duration: int
+        - priority: int
+        - isDaily: bool
+        - completed: bool
+        - completed_at: datetime
+        - schedulerList: List~Scheduler~
+        + Task(pet: Pet, taskCode: int, duration: int = 0, priority: int = -1, isDaily: bool = False)
+        + getTaskID(): int
+        + getPet(): Pet
+        + getTaskCode(): int
+        + setTaskCode(task_code: int): None
+        + getPriority(): int
+        + setPriority(priority: int): None
+        + isDailyTask(): bool
+        + setDaily(is_daily: bool): None
+        + isTaskCompleted(): bool
+        + setTaskDuration(duration: int): None
+        + getTaskDuration(): int
+        + doTask(): Optional~Task~
+        + resetCompletion(): None
+        + getCompletedAt(): Optional~datetime~
+        + getTaskDescription(): str
+        + addScheduler(scheduler: Scheduler): None
+        + removeScheduler(scheduler: Scheduler): None
+        + getSchedulerList(): List~Scheduler~
+        + getScheduleCount(): int
+        + isTaskValid(): bool
+        - _spawnNextOccurrence(): Task
+    }
+
+    class Scheduler {
+        - schedulerID: int
+        - task: Task
+        - year: int
+        - month: int
+        - date: int
+        - time: str
+        + Scheduler(task: Task, year: int = 0, month: int = 0, date: int = 0, time: str = "")
+        + getSchedulerID(): int
+        + getYear(): int
+        + setYear(year: int): None
+        + getMonth(): str
+        + setMonth(month: int): None
+        + getDate(): str
+        + setDate(date: int): None
+        + getTime(): str
+        + setTime(time: str): None
+        + getTask(): Task
+        + getPet(): Optional~Pet~
+        + getPetName(): str
+        + getTaskType(): str
+        + getTaskDuration(): int
+        + getStartMinutes(): int
+        + getEndMinutes(): int
+        + getEndTime(): str
+        + isSameDate(other: Scheduler): bool
+        + overlaps(other: Scheduler): bool
+        + isScheduleInPast(): bool
+        + isScheduleToday(): bool
+        + isScheduleUpcoming(): bool
+        + getFullDateTime(): str
+        + getDateString(): str
+        + validateSchedule(): dict
+        + getScheduleSummary(): dict
+        + getKey(): str
+        + setKey(key: str): None
+    }
+
+    class SchedulingModule {
+        <<module>>
+        + ownerList: List~Owner~
+        + petList: List~Pet~
+        + schedulerDictionary: dict
+        + newOwner(owner_name: str): Owner
+        + newPet(pet_name: str, owner: Owner): Pet
+        + newScheduler(task: Task, year: int, month: int, date: int, time: str): Scheduler
+        + getOwnersByName(name: str): List~Owner~
+        + getPetsByName(name: str): List~Pet~
+        + getPetsByTaskType(task_code: int): List~Pet~
+        + getTasksByOwner(owner: Owner): List~Task~
+        + getSchedulesByDate(year: int, month: int, date: int): List~Scheduler~
+        + getPetSchedules(pet: Pet): List~Scheduler~
+        + detectConflicts(schedulers: List~Scheduler~): List~tuple~
+        + hasConflicts(schedulers: List~Scheduler~): bool
+        + buildDayPlan(tasks: List~Task~, day_start: str, day_end: str): dict
+        + getFreeSlots(schedulers: List~Scheduler~, day_start: str, day_end: str): List~tuple~
+        + findFreeSlot(duration: int, schedulers: List~Scheduler~, day_start: str, day_end: str): Optional~tuple~
+    }
+
+    Owner "1" o-- "*" Pet : owns
+    Pet "1" o-- "*" Task : has
+    Task "1" o-- "*" Scheduler : scheduled by
+    Scheduler --> Task : references
+    Task --> Pet : belongs to
+    Pet --> Owner : belongs to
+    SchedulingModule ..> Owner : manages
+    SchedulingModule ..> Pet : manages
+    SchedulingModule ..> Task : sorts / filters / plans
+    SchedulingModule ..> Scheduler : schedules / detects conflicts

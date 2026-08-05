@@ -1,0 +1,99 @@
+flowchart LR
+    %% PawPal+ dataflow from user input through processing to UI output
+
+    subgraph Input
+        UI_OwnerName["Owner name input"]
+        UI_AddOwner["Add Owner button"]
+        UI_PetName["Pet name input"]
+        UI_AddPet["Add Pet button"]
+        UI_TaskType["Task type select"]
+        UI_Duration["Duration input"]
+        UI_Priority["Priority select"]
+        UI_Date["Date input"]
+        UI_Time["Time input"]
+        UI_Daily["Daily task checkbox"]
+        UI_Repeat["Repeat task options"]
+        UI_CreateTask["Create & Schedule Task button"]
+        UI_PlanStart["Plan start time input"]
+        UI_PlanEnd["Plan end time input"]
+        UI_BuildPlan["Build plan button"]
+    end
+
+    subgraph Process
+        CreateOwner["newOwner(...)\nownerList append"]
+        CreatePet["newPet(...)\npetList append"]
+        CreateTask["Task(...)\naddPetTask(...)"]
+        ScheduleTask["newScheduler(...)\nscheduleRecurring(...)"]
+        FreeSlot["findFreeSlot(...)\ngetSchedulersByDate(...)"]
+        OverbookCheck["isDateOverbooked(...)\ngetDailyLoad(...)"]
+        ConflictCheck["detectConflicts(...)\nfindConflictingSchedules()"]
+        Plan["planDay(...)\nbuildDayPlan(...)"]
+        TodayFetch["getSchedulersByDate(today)\ngetDailyLoad(today)"]
+        FilterSort["filterSchedules(...)\nsortSchedulesByTime(...)"]
+    end
+
+    subgraph Output
+        OwnerListDisplay["Owner list display"]
+        PetListDisplay["Pet list display"]
+        FreeSlotHint["Suggested free slot caption"]
+        TaskTable["Task schedule table"]
+        PlanTable["Planned day table"]
+        TodaySchedule["Today's schedule table"]
+        Banners["Overbook/conflict warnings"]
+        HumanReview["Human review / QA checks"]
+        AutomatedTests["Automated tests (pytest)\nvalidate scheduling logic"]
+    end
+
+    UI_AddOwner --> CreateOwner
+    CreateOwner --> OwnerListDisplay
+
+    UI_AddPet --> CreatePet
+    CreatePet --> PetListDisplay
+
+    UI_CreateTask --> CreateTask
+    CreateTask --> ScheduleTask
+    ScheduleTask --> TaskTable
+
+    UI_Date --> FreeSlot
+    UI_Duration --> FreeSlot
+    FreeSlot --> FreeSlotHint
+
+    ScheduleTask --> OverbookCheck
+    ScheduleTask --> ConflictCheck
+    OverbookCheck --> Banners
+    ConflictCheck --> Banners
+
+    UI_BuildPlan --> Plan
+    Plan --> PlanTable
+
+    TodayFetch --> FilterSort
+    FilterSort --> TodaySchedule
+    TodayFetch --> Banners
+
+    TaskTable --> HumanReview
+    PlanTable --> HumanReview
+    TodaySchedule --> HumanReview
+    Banners --> HumanReview
+
+    TaskTable --> AutomatedTests
+    PlanTable --> AutomatedTests
+    TodaySchedule --> AutomatedTests
+
+    UI_OwnerName --> UI_AddOwner
+    UI_PetName --> UI_AddPet
+    UI_TaskType --> UI_CreateTask
+    UI_Priority --> UI_CreateTask
+    UI_Time --> UI_CreateTask
+    UI_Daily --> UI_CreateTask
+    UI_Repeat --> UI_CreateTask
+    UI_PlanStart --> UI_BuildPlan
+    UI_PlanEnd --> UI_BuildPlan
+
+    CreateOwner -->|updates| stSession["st.session_state ownerList/petList"]
+    CreatePet -->|updates| stSession
+    CreateTask -->|updates| stSession
+
+    stSession --> OwnerListDisplay
+    stSession --> PetListDisplay
+    stSession --> TaskTable
+    stSession --> TodaySchedule
