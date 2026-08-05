@@ -14,6 +14,13 @@ import pytest
 from pawpal_system import (
     Owner, Pet, Task, Scheduler,
     newOwner, newPet, newScheduler,
+    removeOwner, removePet,
+    getOwnerByName, getPetByName,
+    getPetsByOwner, getPetsByTaskType,
+    getPetsWithPendingTasks, getPetsWithNoTasks,
+    getPetStatistics, getSchedulerByKey,
+    scheduleRecurring, buildDayPlan, getFreeSlots,
+    findFreeSlot, isDateOverbooked, filterSchedules,
     sortSchedulesByTime, sortTasksByScheduledTime,
     checkScheduleConflict, detectConflicts, hasConflicts,
     clearAllData, ownerList, petList, schedulerDictionary
@@ -768,7 +775,6 @@ class TestOverlapDetection:
 
         s_other = self._schedule(2026, 7, 6, "09:00", duration=60, pet_name="Milo")
 
-        # The zero-length interval [09:00, 09:00) overlaps nothing.
         assert (s_zero, s_other) not in detectConflicts([s_zero, s_other]) and \
                (s_other, s_zero) not in detectConflicts([s_zero, s_other]), \
             "A zero-duration task should not register as an overlap"
@@ -778,6 +784,201 @@ class TestOverlapDetection:
         assert detectConflicts([]) == [], "Empty input should yield no conflicts"
         s1 = self._schedule(2026, 7, 6, "09:00")
         assert detectConflicts([s1]) == [], "A single schedule cannot conflict"
+
+
+class TestGlobalLookupAndCleanup:
+    """Test global registry lookups, cleanup, and convenience helpers."""
+
+    def setup_method(self):
+        clearAllData()
+        ownerList.clear()
+        petList.clear()
+        schedulerDictionary.clear()
+
+    def test_remove_pet_cascades_tasks_and_scheduler_cleanup(self):
+        owner = newOwner("Test Owner")
+        pet = newPet("Test Pet", owner)
+        task = Task(pet=pet, taskCode=0, duration=30)
+        pet.addPetTask(task)
+        sched = newScheduler(task, 2026, 7, 6, "09:00")
+
+        assert sched in schedulerDictionary["20260706"]
+        assert task in pet.getPetTaskList()
+
+        assert removePet(pet) is True
+
+        assert pet not in owner.getPetList(), "Removed pet should no longer belong to owner"
+        assert pet not in petList, "Removed pet should no longer be in global pet list"
+        assert "20260706" not in schedulerDictionary, "Scheduler for removed pet should be cleaned up"
+        assert task.getSchedulerList() == [], "Task schedulers should be removed when pet is removed"
+
+    def test_remove_owner_cascades_pet_and_schedule_cleanup(self):
+        owner = newOwner("Test Owner")
+        pet = newPet("Test Pet", owner)
+        task = Task(pet=pet, taskCode=0, duration=30)
+        pet.addPetTask(task)
+        newScheduler(task, 2026, 7, 6, "09:00")
+
+        assert removeOwner(owner) is True
+        assert owner not in ownerList, "Removed owner should not remain in global owner list"
+        assert pet not in petList, "Pets for removed owner should also be removed"
+        assert schedulerDictionary == {}, "Schedulers for removed owner should be removed"
+
+    def test_clear_all_data_returns_owner_count_and_clears_state(self):
+        owner = newOwner("Test Owner")
+        newPet("Pet A", owner)
+        newPet("Pet B", owner)
+
+        assert clearAllData() == 1
+        assert ownerList == []
+        assert petList == []
+        assert schedulerDictionary == {}
+
+    def test_clear_all_data_clears_indexes_and_scheduler_state(self):
+        owner = newOwner("Index Owner")
+        pet = newPet("Index Pet", owner)
+        task = Task(pet=pet, taskCode=0, duration=30)
+        pet.addPetTask(task)
+        newScheduler(task, 2026, 7, 6, "09:00")
+
+        assert getOwnerByName("Index Owner") == owner
+        assert getPetByName("Index Pet") == pet
+        assert getSchedulerByKey("20260706") != []
+
+        assert clearAllData() == 1
+
+        assert getOwnerByName("Index Owner") is None
+        assert getPetByName("Index Pet") is None
+        assert getSchedulerByKey("20260706") == []
+        assert schedulerDictionary == {}
+
+    def test_get_scheduler_by_key_returns_empty_after_clear_all_data(self):
+        owner = newOwner("Cleaner")
+        pet = newPet("Paws", owner)
+        task = Task(pet=pet, taskCode=1, duration=20)
+        pet.addPetTask(task)
+        newScheduler(task, 2026, 7, 7, "10:00")
+
+        assert getSchedulerByKey("20260707") != []
+        assert clearAllData() == 1
+        assert getSchedulerByKey("20260707") == []
+
+    def test_get_owner_and_pet_lookup_is_case_insensitive(self):
+        owner = newOwner("Jane Doe")
+        pet = newPet("Mochi", owner)
+
+        assert getOwnerByName("jane doe") == owner
+        assert getPetByName("mochi") == pet
+
+    def test_get_pets_by_owner_and_task_type_convenience(self):
+        owner = newOwner("Jane Doe")
+        pet1 = newPet("Mochi", owner)
+        pet2 = newPet("Buddy", owner)
+        task1 = Task(pet=pet1, taskCode=0, duration=30)
+        task2 = Task(pet=pet2, taskCode=1, duration=15)
+        pet1.addPetTask(task1)
+        pet2.addPetTask(task2)
+
+        assert getPetsByOwner(owner) == [pet1, pet2]
+        assert getPetsByTaskType(0) == [pet1]
+        assert getPetsByTaskType(1) == [pet2]
+
+    def test_pending_and_no_task_filters(self):
+        owner = newOwner("Jane Doe")
+        pet1 = newPet("Mochi", owner)
+        pet2 = newPet("Buddy", owner)
+        task = Task(pet=pet1, taskCode=0, duration=30)
+        pet1.addPetTask(task)
+
+        assert getPetsWithPendingTasks() == [pet1]
+        assert getPetsWithNoTasks() == [pet2]
+
+    def test_get_pet_statistics_returns_expected_counts(self):
+        owner = newOwner("Jane Doe")
+        pet = newPet("Mochi", owner)
+        task = Task(pet=pet, taskCode=0, duration=30)
+        pet.addPetTask(task)
+        newScheduler(task, 2026, 7, 6, "09:00")
+
+        stats = getPetStatistics()
+        assert stats['total_pets'] == 1
+        assert stats['total_tasks'] == 1
+        assert stats['total_schedules'] == 1
+
+
+class TestValidationAndPlanning:
+    """Test validation paths, recurring scheduling, and day-planning helpers."""
+
+    def setup_method(self):
+        clearAllData()
+        ownerList.clear()
+        petList.clear()
+        schedulerDictionary.clear()
+
+    def test_schedule_recurring_rejects_bad_arguments(self):
+        owner = newOwner("Jane Doe")
+        pet = newPet("Mochi", owner)
+        task = Task(pet=pet, taskCode=0, duration=30)
+        pet.addPetTask(task)
+
+        with pytest.raises(ValueError):
+            scheduleRecurring(task, 2026, 7, 6, "09:00", occurrences=0)
+
+        with pytest.raises(ValueError):
+            scheduleRecurring(task, 2026, 7, 6, "09:00", occurrences=3, interval_days=0)
+
+    def test_build_day_plan_returns_unplaced_when_tasks_exceed_day(self):
+        owner = newOwner("Jane Doe")
+        pet = newPet("Mochi", owner)
+        tasks = [Task(pet=pet, taskCode=0, duration=300), Task(pet=pet, taskCode=1, duration=300), Task(pet=pet, taskCode=2, duration=300)]
+        for task in tasks:
+            pet.addPetTask(task)
+
+        plan = buildDayPlan(tasks, day_start="08:00", day_end="12:00")
+
+        assert plan['total_minutes'] == 0
+        assert len(plan['planned']) == 0
+        assert len(plan['unplaced']) == 3
+
+    def test_build_day_plan_ignores_zero_duration_tasks(self):
+        owner = newOwner("Jane Doe")
+        pet = newPet("Mochi", owner)
+        zero_task = Task(pet=pet, taskCode=0)  # duration 0
+        pet.addPetTask(zero_task)
+
+        plan = buildDayPlan([zero_task])
+
+        assert plan['planned'] == []
+        assert plan['unplaced'] == [zero_task]
+
+    def test_get_free_slots_and_find_free_slot_account_for_booked_times(self):
+        owner = newOwner("Jane Doe")
+        pet = newPet("Mochi", owner)
+        task1 = Task(pet=pet, taskCode=0, duration=60)
+        task2 = Task(pet=pet, taskCode=1, duration=30)
+        pet.addPetTask(task1)
+        pet.addPetTask(task2)
+        s1 = newScheduler(task1, 2026, 7, 6, "09:00")
+        s2 = newScheduler(task2, 2026, 7, 6, "10:00")
+
+        slots = getFreeSlots([s1, s2], day_start="08:00", day_end="12:00")
+        assert slots[0] == ("08:00", "09:00")
+        assert slots[1] == ("10:30", "12:00")
+        assert findFreeSlot([s1, s2], 45, day_start="08:00", day_end="12:00") == "08:00"
+        assert findFreeSlot([s1, s2], 120, day_start="08:00", day_end="12:00") is None
+
+    def test_is_date_overbooked_returns_true_when_above_budget(self):
+        owner = newOwner("Jane Doe")
+        pet = newPet("Mochi", owner)
+        task = Task(pet=pet, taskCode=0, duration=500)
+        pet.addPetTask(task)
+        newScheduler(task, 2026, 7, 6, "09:00")
+
+        assert isDateOverbooked(2026, 7, 6, budget_minutes=480) is True
+        assert isDateOverbooked(2026, 7, 6, budget_minutes=600) is False
+
+    def test_get_scheduler_by_key_returns_empty_for_missing_key(self):
+        assert getSchedulerByKey("19990101") == []
 
 
 if __name__ == "__main__":

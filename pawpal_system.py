@@ -247,11 +247,12 @@ def clearAllData() -> int:
     count = len(ownerList)
     for owner in ownerList[:]:  # Create copy to avoid modification during iteration
         removeOwner(owner)
-    # Defensive: ensure indexes are fully cleared even if a cascade missed one.
+    # Defensive: ensure all global state is fully cleared.
     _owner_id_index.clear()
     _owner_name_index.clear()
     _pet_id_index.clear()
     _pet_name_index.clear()
+    schedulerDictionary.clear()
     return count
 
 
@@ -353,11 +354,11 @@ def getPetsByTaskType(task_code: int) -> List['Pet']:
     Return all pets that have tasks of a specific type.
     Example: getPetsByTaskType(0) returns pets with Walk tasks.
     """
-    pets_with_type = set()
+    pets_with_type = []
     for pet in petList:
-        if pet.getTasksByType(task_code):
-            pets_with_type.add(pet)
-    return list(pets_with_type)
+        if pet.getTasksByType(task_code) and pet not in pets_with_type:
+            pets_with_type.append(pet)
+    return pets_with_type
 
 
 def getPetsWithPendingTasks() -> List['Pet']:
@@ -1447,7 +1448,7 @@ class Pet:
         # Cascading cleanup: remove all schedulers associated with this task
         if hasattr(task, 'schedulerList'):
             for scheduler in task.schedulerList[:]:  # Create copy to avoid modification during iteration
-                task.removeScheduler(scheduler)
+                removeScheduler(scheduler)
 
         self.petTaskList.remove(task)
         return True
