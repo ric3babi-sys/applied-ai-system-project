@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 from datetime import datetime
 
 # Import PawPal+ system classes and functions
@@ -101,6 +102,290 @@ def init_pawpal_session():
 # Initialize session state on app load
 init_pawpal_session()
 
+
+def find_owner_by_name(owner_name: str):
+    normalized = owner_name.strip().lower()
+    return next(
+        (owner for owner in st.session_state.ownerList
+         if owner.getOwnerName().strip().lower() == normalized),
+        None,
+    )
+
+
+def find_pet_by_name(pet_name: str):
+    normalized = pet_name.strip().lower()
+    return next(
+        (pet for pet in st.session_state.petList
+         if pet.getPetName().strip().lower() == normalized),
+        None,
+    )
+
+
+def parse_owner_command(command: str):
+    match = re.search(
+        r'owner\s+(?:named\s+)?["\']?(?P<name>.+?)["\']?(?:\s+for\b|\s+with\b|\s+to\b|$)',
+        command,
+        re.IGNORECASE,
+    )
+    return match.group('name').strip() if match else None
+
+
+def parse_pet_command(command: str):
+    match = re.search(
+        r'pet\s+(?:named\s+)?["\']?(?P<pet>.+?)["\']?\s+for\s+["\']?(?P<owner>.+?)["\']?(?:\s|$)',
+        command,
+        re.IGNORECASE,
+    )
+    if match:
+        return match.group('pet').strip(), match.group('owner').strip()
+    return None, None
+
+
+def find_task_for_pet(pet, task_code: int):
+    for task in pet.getPetTaskList():
+        if task.getTaskCode() == task_code:
+            return task
+    return None
+
+
+def find_task_for_pet_on_date(pet, task_code: int, date_str: str):
+    for task in pet.getPetTaskList():
+        if task.getTaskCode() != task_code:
+            continue
+        for scheduler in task.getSchedulerList():
+            if scheduler.getDateString() == date_str:
+                return task, scheduler
+    return None, None
+
+
+def parse_task_command(command: str):
+    lower = command.lower()
+    pet = None
+    for candidate in st.session_state.petList:
+        if candidate.getPetName().lower() in lower:
+            pet = candidate
+            break
+
+    task_code = None
+    for code, label in st.session_state.TASK_TYPES.items():
+        if label.lower() in lower:
+            task_code = code
+            break
+
+    date_match = re.search(r'\b(\d{4}-\d{2}-\d{2})\b', command)
+    time_match = re.search(r'\b(\d{1,2}:\d{2})\b', command)
+    duration_match = re.search(r'\b(\d+)\s*(?:min|mins|minutes)\b', command, re.IGNORECASE)
+    priority_words = {
+        'urgent': 3,
+        'high': 2,
+        'normal': 1,
+        'medium': 1,
+        'low': 0,
+    }
+    priority = 0
+    for word, value in priority_words.items():
+        if word in lower:
+            priority = value
+            break
+
+    return {
+        'pet': pet,
+        'task_code': task_code,
+        'date': date_match.group(1) if date_match else None,
+        'time': time_match.group(1) if time_match else None,
+        'duration': int(duration_match.group(1)) if duration_match else 30,
+        'priority': priority,
+    }
+
+
+def execute_natural_language_input(command: str):
+    command = command.strip()
+    if not command:
+        return {'success': False, 'message': 'Enter a natural language command first.'}
+
+    lower = command.lower()
+    if 'owner' in lower and any(word in lower for word in ('remove', 'delete')):
+        owner_name = parse_owner_command(command)
+        if not owner_name:
+            return {
+                'success': False,
+                'message': 'Could not identify the owner name. Try: remove owner Jordan',
+            }
+        owner = find_owner_by_name(owner_name)
+        if not owner:
+            return {
+                'success': False,
+                'message': f"Owner '{owner_name}' not found.",
+            }
+        removeOwner(owner)
+        st.session_state.ownerList = [o for o in st.session_state.ownerList if o != owner]
+        st.session_state.petList = [p for p in st.session_state.petList if p.getOwner() != owner]
+        return {
+            'success': True,
+            'message': f"Removed owner '{owner_name}' and all their pets/tasks.",
+        }
+
+    if 'pet' in lower and any(word in lower for word in ('remove', 'delete')):
+        pet_name, owner_name = parse_pet_command(command)
+        if not pet_name or not owner_name:
+            return {
+                'success': False,
+                'message': 'Could not identify pet name and owner. Try: remove pet Mochi for Jordan',
+            }
+        owner = find_owner_by_name(owner_name)
+        if not owner:
+            return {
+                'success': False,
+                'message': f"Owner '{owner_name}' not found.",
+            }
+        pet = next((p for p in owner.getPetList() if p.getPetName().strip().lower() == pet_name.strip().lower()), None)
+        if not pet:
+            return {
+                'success': False,
+                'message': f"Pet '{pet_name}' for owner '{owner_name}' not found.",
+            }
+        removePet(pet)
+        st.session_state.petList = [p for p in st.session_state.petList if p != pet]
+        return {
+            'success': True,
+            'message': f"Removed pet '{pet_name}' from owner '{owner_name}'.",
+        }
+
+    if 'task' in lower and any(word in lower for word in ('remove', 'delete')):
+        parsed = parse_task_command(command)
+        if not parsed['pet']:
+            return {
+                'success': False,
+                'message': 'Could not identify the pet in the command. Use a pet name like Mochi.',
+            }
+        if parsed['task_code'] is None:
+            return {
+                'success': False,
+                'message': 'Could not identify the task type. Use one of the known task names.',
+            }
+
+        task = None
+        scheduler = None
+        if parsed['date']:
+            task, scheduler = find_task_for_pet_on_date(parsed['pet'], parsed['task_code'], parsed['date'])
+        if not task:
+            task = find_task_for_pet(parsed['pet'], parsed['task_code'])
+
+        if not task:
+            return {
+                'success': False,
+                'message': f"No task '{st.session_state.TASK_TYPES[parsed['task_code']]}' found for {parsed['pet'].getPetName()}.",
+            }
+
+        if scheduler:
+            removeScheduler(scheduler)
+            if task.getScheduleCount() == 0:
+                parsed['pet'].removePetTask(task)
+            return {
+                'success': True,
+                'message': f"Removed scheduled occurrence for '{st.session_state.TASK_TYPES[parsed['task_code']]}' on {parsed['date']} for {parsed['pet'].getPetName()}.",
+            }
+
+        removed = parsed['pet'].removePetTask(task)
+        if not removed:
+            return {
+                'success': False,
+                'message': 'Failed to remove the task. It may already be deleted.',
+            }
+        return {
+            'success': True,
+            'message': f"Removed task '{st.session_state.TASK_TYPES[parsed['task_code']]}' for {parsed['pet'].getPetName()}.",
+        }
+
+    if 'owner' in lower and any(word in lower for word in ('add', 'create')):
+        owner_name = parse_owner_command(command)
+        if not owner_name:
+            return {
+                'success': False,
+                'message': 'Could not identify the owner name. Try: add owner Jordan',
+            }
+        if find_owner_by_name(owner_name):
+            return {
+                'success': False,
+                'message': f"Owner '{owner_name}' already exists.",
+            }
+        owner = newOwner(owner_name)
+        st.session_state.ownerList.append(owner)
+        return {
+            'success': True,
+            'message': f"Added owner '{owner_name}' successfully.",
+        }
+
+    if 'pet' in lower and any(word in lower for word in ('add', 'create')):
+        pet_name, owner_name = parse_pet_command(command)
+        if not pet_name or not owner_name:
+            return {
+                'success': False,
+                'message': 'Could not identify pet name and owner. Try: add pet Mochi for Jordan',
+            }
+        owner = find_owner_by_name(owner_name)
+        if not owner:
+            return {
+                'success': False,
+                'message': f"Owner '{owner_name}' was not found. Add that owner first.",
+            }
+        if find_pet_by_name(pet_name):
+            return {
+                'success': False,
+                'message': f"Pet '{pet_name}' already exists.",
+            }
+        pet = newPet(pet_name, owner)
+        st.session_state.petList.append(pet)
+        return {
+            'success': True,
+            'message': f"Added pet '{pet_name}' for owner '{owner_name}'.",
+        }
+
+    if any(word in lower for word in ('schedule', 'task', 'feed', 'walk', 'groom', 'vet', 'play')):
+        parsed = parse_task_command(command)
+        if not parsed['pet']:
+            return {
+                'success': False,
+                'message': 'Could not identify the pet in the command. Use a pet name like Mochi.',
+            }
+        if parsed['task_code'] is None:
+            return {
+                'success': False,
+                'message': 'Could not identify the task type. Use one of the known task names.',
+            }
+
+        task = Task(
+            pet=parsed['pet'],
+            taskCode=parsed['task_code'],
+            priority=parsed['priority'],
+            isDaily=False,
+        )
+        task.setTaskDuration(parsed['duration'])
+        added = parsed['pet'].addPetTask(task)
+        if not added:
+            return {
+                'success': False,
+                'message': f"Task for pet '{parsed['pet'].getPetName()}' already exists or failed to add.",
+            }
+
+        details = []
+        if parsed['date'] and parsed['time']:
+            year, month, day = map(int, parsed['date'].split('-'))
+            newScheduler(task, year=year, month=month, date=day, time=parsed['time'])
+            details.append(f"Scheduled on {parsed['date']} at {parsed['time']}")
+
+        return {
+            'success': True,
+            'message': f"Created task '{st.session_state.TASK_TYPES[parsed['task_code']]}' for {parsed['pet'].getPetName()}.",
+            'details': '\n'.join(details) if details else None,
+        }
+
+    return {
+        'success': False,
+        'message': 'The command was not recognized. Try adding an owner, adding a pet, or scheduling a task.',
+    }
+
+
 st.title("🐾 PawPal+")
 
 st.markdown(
@@ -136,6 +421,41 @@ At minimum, your system should:
     )
 
 st.divider()
+
+left_col, right_col = st.columns([3, 7])
+with left_col:
+    st.subheader("Natural language command pane")
+    st.markdown(
+        "Use natural language commands to add owners, add pets, or schedule tasks."
+    )
+    nlp_command = st.text_area(
+        "Enter a command", key="nl_command", height=260,
+        placeholder="e.g. add owner Jordan\nadd pet Mochi for Jordan\nschedule walk for Mochi on 2026-08-25 at 09:00 for 30 minutes, high priority"
+    )
+    if st.button("Execute command", key="nl_execute"):
+        result = execute_natural_language_input(nlp_command)
+        if result['success']:
+            st.success(result['message'])
+            if result.get('details'):
+                st.info(result['details'])
+        else:
+            st.error(result['message'])
+
+with right_col:
+    st.subheader("Command helper")
+    st.markdown(
+        """
+This command parser is case-insensitive for owner and pet names.
+
+- `add owner Jordan`
+- `add pet Mochi for Jordan`
+- `schedule walk for Mochi on 2026-08-25 at 09:00 for 30 minutes, high priority`
+- `remove owner Jordan`
+- `remove pet Mochi for Jordan`
+- `delete task walk for Mochi`
+- `remove task walk for Mochi on 2026-08-25`
+"""
+    )
 
 st.subheader("Owner & Pet Management")
 
