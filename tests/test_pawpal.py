@@ -26,6 +26,8 @@ from pawpal_system import (
     clearAllData, ownerList, petList, schedulerDictionary
 )
 
+import app as pawpal_app  # Import app module to validate natural language command parsing and execution
+
 
 class TestTaskDoTask:
     """Test suite for Task.doTask() method and completion status."""
@@ -904,6 +906,119 @@ class TestGlobalLookupAndCleanup:
         assert stats['total_pets'] == 1
         assert stats['total_tasks'] == 1
         assert stats['total_schedules'] == 1
+
+
+class TestNaturalLanguageCommands:
+    """Natural language command coverage for the PawPal+ app layer."""
+
+    def setup_method(self):
+        clearAllData()
+        ownerList.clear()
+        petList.clear()
+        schedulerDictionary.clear()
+        pawpal_app.st.session_state.clear()
+        pawpal_app.init_pawpal_session()
+
+    def test_add_owner_command_creates_owner(self):
+        """Verify natural language owner creation is accepted and stored."""
+        result = pawpal_app.execute_natural_language_input("Add owner Jordan")
+
+        assert result['success'] is True
+        assert "Jordan" in result['message']
+        assert pawpal_app.find_owner_by_name("jordan") is not None
+
+    def test_add_pet_command_is_case_insensitive(self):
+        """Verify pet creation command matches owner names without case sensitivity."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        result = pawpal_app.execute_natural_language_input("Add pet Mochi for jordan")
+
+        assert result['success'] is True
+        pet = pawpal_app.find_pet_by_name("mochi")
+        assert pet is not None
+        assert pet.getOwner().getOwnerName() == "Jordan"
+
+    def test_schedule_feed_command_with_date_and_time(self):
+        """Verify feed commands can schedule a pet task on a specific date and time."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input(
+            "Feed Mochi on 2026-08-25 at 18:00"
+        )
+
+        assert result['success'] is True
+        assert "Scheduled on 2026-08-25 at 18:00" in result.get('details', "")
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        assert pet is not None
+        task = pawpal_app.find_task_for_pet(pet, 1)
+        assert task is not None
+        assert any(s.getDateString() == "2026-08-25" for s in task.getSchedulerList())
+
+    def test_shorthand_walk_command_creates_walk_task(self):
+        """Verify shorthand walk commands like 'walk Mochi' are recognized."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input("walk Mochi")
+
+        assert result['success'] is True
+        assert "Walk Pet" in result['message']
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        assert pet is not None
+        task = pawpal_app.find_task_for_pet(pet, 0)
+        assert task is not None
+
+    def test_shorthand_feed_command_creates_feed_task(self):
+        """Verify shorthand feed commands like 'feed Mochi' are recognized."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input("feed Mochi")
+
+        assert result['success'] is True
+        assert "Feed Pet" in result['message']
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        assert pet is not None
+        task = pawpal_app.find_task_for_pet(pet, 1)
+        assert task is not None
+
+    def test_case_insensitive_task_command_variations(self):
+        """Verify case-insensitive task commands like 'Feed PET Mochi' and 'Walk pet Mochi'."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result_feed = pawpal_app.execute_natural_language_input("Feed PET Mochi")
+        assert result_feed['success'] is True
+        assert "Feed Pet" in result_feed['message']
+
+        result_walk = pawpal_app.execute_natural_language_input("Walk pet Mochi")
+        assert result_walk['success'] is True
+        assert "Walk Pet" in result_walk['message']
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        assert pet is not None
+        assert pawpal_app.find_task_for_pet(pet, 1) is not None
+        assert pawpal_app.find_task_for_pet(pet, 0) is not None
+
+    def test_remove_scheduled_task_by_date(self):
+        """Verify scheduled task deletion via natural language delete commands."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+        pawpal_app.execute_natural_language_input("Feed Mochi on 2026-08-25 at 18:00")
+
+        result = pawpal_app.execute_natural_language_input(
+            "Remove task feed Mochi on 2026-08-25"
+        )
+
+        assert result['success'] is True
+        assert "Removed scheduled occurrence" in result['message']
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        task = pawpal_app.find_task_for_pet(pet, 1)
+        assert task is None, "The pet task should be removed once its only scheduler is deleted."
 
 
 class TestValidationAndPlanning:

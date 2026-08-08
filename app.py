@@ -162,22 +162,30 @@ def parse_task_command(command: str):
     lower = command.lower()
     pet = None
     for candidate in st.session_state.petList:
-        if candidate.getPetName().lower() in lower:
+        if candidate.getPetName().strip().lower() in lower:
             pet = candidate
             break
 
     task_code = None
     task_label = None
-    for code, label in st.session_state.TASK_TYPES.items():
-        label_lower = label.lower()
-        if label_lower in lower:
-            task_code = code
-            task_label = label_lower
+    task_keyword_map = {
+        0: ["walk", "walk pet"],
+        1: ["feed", "feed pet"],
+        2: ["nap", "nap time"],
+        3: ["vet", "veterinarian", "vet visit", "veterinarian visit"],
+    }
+    for code, keywords in task_keyword_map.items():
+        for keyword in keywords:
+            if keyword in lower:
+                task_code = code
+                task_label = keyword
+                break
+        if task_code is not None:
             break
 
     if not pet and task_label:
         # Support shorter commands like "walk Mochi", "feed Mochi", or
-        # "feed pet Mochi" in the same way as "walk pet Mochi".
+        # "feed pet Mochi" even when the full task label is not present.
         pattern = rf'\b{re.escape(task_label)}\s+(?:pet\s+)?(?P<pet>.+?)(?:\s+on\b|\s+at\b|\s+for\b|$)'
         match = re.search(pattern, lower)
         if match:
