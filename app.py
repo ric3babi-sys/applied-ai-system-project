@@ -167,10 +167,28 @@ def parse_task_command(command: str):
             break
 
     task_code = None
+    task_label = None
     for code, label in st.session_state.TASK_TYPES.items():
-        if label.lower() in lower:
+        label_lower = label.lower()
+        if label_lower in lower:
             task_code = code
+            task_label = label_lower
             break
+
+    if not pet and task_label:
+        # Support shorter commands like "walk Mochi", "feed Mochi", or
+        # "feed pet Mochi" in the same way as "walk pet Mochi".
+        pattern = rf'\b{re.escape(task_label)}\s+(?:pet\s+)?(?P<pet>.+?)(?:\s+on\b|\s+at\b|\s+for\b|$)'
+        match = re.search(pattern, lower)
+        if match:
+            candidate_name = match.group('pet').strip()
+            for candidate in st.session_state.petList:
+                if candidate.getPetName().strip().lower() == candidate_name:
+                    pet = candidate
+                    break
+                if candidate_name in candidate.getPetName().strip().lower():
+                    pet = candidate
+                    break
 
     date_match = re.search(r'\b(\d{4}-\d{2}-\d{2})\b', command)
     time_match = re.search(r'\b(\d{1,2}:\d{2})\b', command)
@@ -450,6 +468,9 @@ This command parser is case-insensitive for owner and pet names.
 - `add owner Jordan`
 - `add pet Mochi for Jordan`
 - `schedule walk for Mochi on 2026-08-25 at 09:00 for 30 minutes, high priority`
+- `feed Mochi on 2026-08-25 at 18:00`
+- `walk Mochi`
+- `feed Mochi`
 - `remove owner Jordan`
 - `remove pet Mochi for Jordan`
 - `delete task walk for Mochi`
