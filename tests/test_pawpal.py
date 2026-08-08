@@ -1003,6 +1003,61 @@ class TestNaturalLanguageCommands:
         assert pawpal_app.find_task_for_pet(pet, 1) is not None
         assert pawpal_app.find_task_for_pet(pet, 0) is not None
 
+    def test_schedule_with_full_month_name_and_numeric_time(self):
+        """Verify scheduler accepts full month names with numeric HH:MM time."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input("Feed Mochi on August 25 2026 at 18:00")
+
+        assert result['success'] is True
+        assert "Scheduled on 2026-08-25 at 18:00" in result.get('details', "")
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        task = pawpal_app.find_task_for_pet(pet, 1)
+        assert task is not None
+        assert any(s.getDateString() == "2026-08-25" for s in task.getSchedulerList())
+
+    def test_schedule_with_day_month_year_full_month_name(self):
+        """Verify parser accepts day-first full month name date order like 25 August 2026."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input("Feed Mochi on 25 August 2026 at 18:00")
+
+        assert result['success'] is True
+        assert "Scheduled on 2026-08-25 at 18:00" in result.get('details', "")
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        task = pawpal_app.find_task_for_pet(pet, 1)
+        assert task is not None
+        assert any(s.getDateString() == "2026-08-25" for s in task.getSchedulerList())
+
+    def test_schedule_with_shorthand_month_name_and_numeric_time(self):
+        """Verify scheduler accepts shorthand month names with numeric HH:MM time."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input("Feed Mochi on Aug 25, 2026 at 18:00")
+
+        assert result['success'] is True
+        assert "Scheduled on 2026-08-25 at 18:00" in result.get('details', "")
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        task = pawpal_app.find_task_for_pet(pet, 1)
+        assert task is not None
+        assert any(s.getDateString() == "2026-08-25" for s in task.getSchedulerList())
+
+    def test_schedule_time_requires_numeric_colon_format(self):
+        """Verify scheduler rejects time inputs that are not numeric HH:MM format."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input("Feed Mochi on Aug 25 2026 at 6pm")
+
+        assert result['success'] is False
+        assert "could not identify" in result['message'].lower() or "time" in result['message'].lower()
+
     def test_remove_scheduled_task_by_date(self):
         """Verify scheduled task deletion via natural language delete commands."""
         pawpal_app.execute_natural_language_input("Add owner Jordan")

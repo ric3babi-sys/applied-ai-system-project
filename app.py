@@ -65,6 +65,22 @@ PRIORITY_LABELS = {0: "Low", 1: "Normal", 2: "High", 3: "Urgent"}
 # Daily care-time budget (minutes) used to flag overbooked days (#7).
 DAILY_BUDGET_MINUTES = 480
 
+# Map month words to numeric values for natural language schedule parsing.
+MONTH_NAME_TO_NUMBER = {
+    'january': 1, 'jan': 1,
+    'february': 2, 'feb': 2,
+    'march': 3, 'mar': 3,
+    'april': 4, 'apr': 4,
+    'may': 5,
+    'june': 6, 'jun': 6,
+    'july': 7, 'jul': 7,
+    'august': 8, 'aug': 8,
+    'september': 9, 'sep': 9, 'sept': 9,
+    'october': 10, 'oct': 10,
+    'november': 11, 'nov': 11,
+    'december': 12, 'dec': 12,
+}
+
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 
@@ -158,6 +174,33 @@ def find_task_for_pet_on_date(pet, task_code: int, date_str: str):
     return None, None
 
 
+def parse_month_word_date(command: str):
+    """Parse month names in natural language dates and return YYYY-MM-DD.
+
+    Supports both full month names and shorthand abbreviations, such as:
+      - August 25 2026
+      - Aug 25 2026
+      - 25 August 2026
+      - 25 Aug 2026
+    """
+    lower = command.lower()
+    month_names = r'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?'
+    patterns = [
+        rf'\b(?P<month>{month_names})\s+(?P<day>\d{{1,2}})(?:st|nd|rd|th)?(?:,)?\s+(?P<year>\d{{4}})\b',
+        rf'\b(?P<day>\d{{1,2}})(?:st|nd|rd|th)?\s+(?P<month>{month_names})(?:,)?\s+(?P<year>\d{{4}})\b',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, lower)
+        if match:
+            month_word = match.group('month')
+            day = int(match.group('day'))
+            year = int(match.group('year'))
+            month = MONTH_NAME_TO_NUMBER.get(month_word)
+            if month and 1 <= day <= 31:
+                return f"{year:04d}-{month:02d}-{day:02d}"
+    return None
+
+
 def parse_task_command(command: str):
     lower = command.lower()
     pet = None
@@ -198,7 +241,13 @@ def parse_task_command(command: str):
                     pet = candidate
                     break
 
-    date_match = re.search(r'\b(\d{4}-\d{2}-\d{2})\b', command)
+    date = None
+    numeric_date_match = re.search(r'\b(\d{4}-\d{2}-\d{2})\b', command)
+    if numeric_date_match:
+        date = numeric_date_match.group(1)
+    else:
+        date = parse_month_word_date(command)
+
     time_match = re.search(r'\b(\d{1,2}:\d{2})\b', command)
     duration_match = re.search(r'\b(\d+)\s*(?:min|mins|minutes)\b', command, re.IGNORECASE)
     priority_words = {
@@ -217,7 +266,7 @@ def parse_task_command(command: str):
     return {
         'pet': pet,
         'task_code': task_code,
-        'date': date_match.group(1) if date_match else None,
+        'date': date,
         'time': time_match.group(1) if time_match else None,
         'duration': int(duration_match.group(1)) if duration_match else 30,
         'priority': priority,
@@ -378,6 +427,13 @@ def execute_natural_language_input(command: str):
             return {
                 'success': False,
                 'message': 'Could not identify the task type. Use one of the known task names.',
+            }
+
+        # Require numeric HH:MM time format for any command that includes a date.
+        if parsed['date'] and not parsed['time']:
+            return {
+                'success': False,
+                'message': 'Scheduled tasks require time in numeric HH:MM format, e.g. 18:00.',
             }
 
         task = Task(
