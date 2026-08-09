@@ -51,7 +51,7 @@ Steps to setup and run enhanced **PawPal+**:
     - `http://localhost:8501`
 
 
-### Sample Interactions
+## Sample Interactions
 Enter each command separately then click the `Execute command` button:
 ```bash
 add owner Jordan
@@ -64,10 +64,15 @@ feed Mochi on 2026-08-25 at 18:00   # adjust date accordingly
 ```
 This will create owner named Jordan. A pet named Mochi is created with Jordan assigned as it's owner. A task is then scheduled to `feed Mochi` at entered date and time.
 
-### Design Decisions
+## Design Decisions
 I designed a natural language interface to make it easier for user to describe what available tasks to schedule for their pet. I was constrained on how many tasks to provide due to time limits. Adding more tasks require planning because there could by specific parameters exclusive to new tasks.
 
-### Testing Summary
+## Testing Summary
+All tests for new functionality passed. Coverage included test cases for parsing natural language into commands that created owner, pet, and task scheduling. Initially tests missed cases for full word months and abbreviations. This was corrected.
 
+## Reflection
+I was pleasantly surprised with how capable AI is in generating code and comments. With detailed prompts and examples, AI was able to infer and understand the task assigned. The code produced can be bloated and room for optimization is there. On another note, it scares me how fast AI learned to code. The future is both exciting and a little scary.
 
+## Reliability and Evaluation: How You Test and Improve Your AI
+For reliability details and confidence analysis, see `Reliability.txt`.
 
