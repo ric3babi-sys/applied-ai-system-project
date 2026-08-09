@@ -1,0 +1,17 @@
+Reliability Assessment for PawPal+ Natural Language Scheduling
+
+Overview:
+- This file captures reliability metrics for natural language parsing and task scheduling.
+- It focuses on month-word date parsing, full and abbreviated month names, and integration through the app command parser.
+
+Reliability Metrics:
+- Full month name parsing: supported for both "August 25 2026" and "25 August 2026".
+- Abbreviated month parsing: supported for both "Aug 25, 2026" and "25 Aug 2026".
+- Natural language scheduling: both full and abbreviated month-word date inputs are accepted and converted to valid schedules.
+- Time validation: scheduled commands with dates require numeric HH:MM time.
+
+Test confidence:
+- The new test module `tests/test_reliability.py` exercises both the parser helper and the end-to-end natural language command flow.
+- Existing natural language tests already cover month-word scheduling, full month names, and shorthand month names.
+- These tests provide focused coverage on the most fragile part of the system: interpreting human-style date strings.
+
