@@ -1,26 +1,40 @@
-# PawPal+ (Module 2 Project)
+# Show What You Know: Applied AI System Project
 
-You are building **PawPal+**, a Streamlit app that helps a pet owner plan care tasks for their pet.
+I am expanding on Week 4 project **PawPal+**. This Streamlit app helps a pet owner plan care tasks for their pet.
 
-## Scenario
+## Title and Summary
 
-A busy pet owner needs help staying consistent with pet care. They want an assistant that can:
+The upgraded **PawPal+** includes multiple enhancements to make the system easier to use. A new input interface is implemented so user can write "add owner Jordan" instead of using keyboard. The following is a list of the new enhancements:
 
-- Track pet care tasks (walks, feeding, meds, enrichment, grooming, etc.)
-- Consider constraints (time available, priority, owner preferences)
-- Produce a daily plan and explain why it chose that plan
+- Added a text input widget and button to process inputed text.
+- Add support for removing/deleting owner, pet, and tasks.
+- Allow for case insensitive matching of commands, owner names, and pet names.
+- Allow walk command in text input to do same task as walk pet.
+- Allow feed command in text input to do same task as feed pet.
+- Allow scheduler month to include month words in full and shorthand mode (April, Apr).
+- Update tests to include new functionality covering natural language commands.
+- Add test edge cases for scheduler date and time inputs.
 
-Your job is to design the system first (UML), then implement the logic in Python, then connect it to the Streamlit UI.
 
-## What you will build
+## Architecture Overview
 
-Your final app should:
+**System Diagram Summary**
+The diagram shows a simple object model for **PawPal+**:
 
-- Let a user enter basic owner + pet info
-- Let a user add/edit tasks (duration + priority at minimum)
-- Generate a daily schedule/plan based on constraints and priorities
-- Display the plan clearly (and ideally explain the reasoning)
-- Include tests for the most important scheduling behaviors
+- Owner owns one or more Pet objects.
+- Each Pet contains multiple Task items.
+- Each Task can have one or more Scheduler entries for planned dates/times.
+- Scheduler points back to its Task, and through the task to the pet.
+
+**A module-level SchedulingModule manages the collections and operations:**
+- creates owners, pets, and schedules
+- looks up pets and owners
+- builds day plans
+- detects conflicts
+- sorts and filters schedules/tasks
+
+The core flow is:
+`Owner -> Pet -> Task -> Scheduler`, with the scheduling module coordinating creation and validation.
 
 ## Getting started
 
