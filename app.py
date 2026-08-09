@@ -185,6 +185,7 @@ def parse_month_word_date(command: str):
     """
     lower = command.lower()
     month_names = r'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?'
+    # Support full month words and common abbreviations, in both month-first and day-first orders.
     patterns = [
         rf'\b(?P<month>{month_names})\s+(?P<day>\d{{1,2}})(?:st|nd|rd|th)?(?:,)?\s+(?P<year>\d{{4}})\b',
         rf'\b(?P<day>\d{{1,2}})(?:st|nd|rd|th)?\s+(?P<month>{month_names})(?:,)?\s+(?P<year>\d{{4}})\b',
@@ -532,7 +533,10 @@ This command parser is case-insensitive for owner and pet names.
 - `add owner Jordan`
 - `add pet Mochi for Jordan`
 - `schedule walk for Mochi on 2026-08-25 at 09:00 for 30 minutes, high priority`
-- `feed Mochi on 2026-08-25 at 18:00`
+- `feed Mochi on August 25 2026 at 18:00`
+- `feed Mochi on Aug 25, 2026 at 18:00`
+- `walk Mochi on 25 August 2026 at 09:00`
+- `walk Mochi on 25 Aug 2026 at 09:00`
 - `walk Mochi`
 - `feed Mochi`
 - `remove owner Jordan`

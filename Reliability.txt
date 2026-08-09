@@ -15,3 +15,11 @@ Test confidence:
 - Existing natural language tests already cover month-word scheduling, full month names, and shorthand month names.
 - These tests provide focused coverage on the most fragile part of the system: interpreting human-style date strings.
 
+Limitations and biases:
+- The parser only recognizes a limited set of task verbs and command patterns.
+- It supports English month names and abbreviations only, not other languages or misspellings.
+- Commands require numeric `HH:MM` time formats for scheduled dates; forms like `6pm` are rejected.
+- The system does not understand broader conversational phrasing such as `tomorrow` or `next Monday`.
+- Ambiguous or overlapping pet/owner names may be parsed incorrectly because the logic uses simple keyword matching.
+- Reliability is highest for the exact command forms covered by tests; unexpected variants may fail.
+
