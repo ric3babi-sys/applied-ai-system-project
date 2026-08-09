@@ -1033,6 +1033,21 @@ class TestNaturalLanguageCommands:
         assert task is not None
         assert any(s.getDateString() == "2026-08-25" for s in task.getSchedulerList())
 
+    def test_schedule_with_day_month_year_shorthand_month_name(self):
+        """Verify parser accepts day-first shorthand month name date order like 25 Aug 2026."""
+        pawpal_app.execute_natural_language_input("Add owner Jordan")
+        pawpal_app.execute_natural_language_input("Add pet Mochi for Jordan")
+
+        result = pawpal_app.execute_natural_language_input("Feed Mochi on 25 Aug 2026 at 18:00")
+
+        assert result['success'] is True
+        assert "Scheduled on 2026-08-25 at 18:00" in result.get('details', "")
+
+        pet = pawpal_app.find_pet_by_name("Mochi")
+        task = pawpal_app.find_task_for_pet(pet, 1)
+        assert task is not None
+        assert any(s.getDateString() == "2026-08-25" for s in task.getSchedulerList())
+
     def test_schedule_with_shorthand_month_name_and_numeric_time(self):
         """Verify scheduler accepts shorthand month names with numeric HH:MM time."""
         pawpal_app.execute_natural_language_input("Add owner Jordan")
