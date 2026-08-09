@@ -4,7 +4,7 @@ I am expanding on Week 4 project **PawPal+**. This Streamlit app helps a pet own
 
 ## Title and Summary
 
-The upgraded **PawPal+** includes multiple enhancements to make the system easier to use. A new input interface is implemented so user can write "add owner Jordan" instead of using keyboard. The following is a list of the new enhancements:
+The upgraded **PawPal+** includes multiple enhancements to make the system easier to use. A new input interface is implemented so user can write "add owner Jordan" instead of entering form data. The following is a list of the new enhancements:
 
 - Added a text input widget and button to process inputed text.
 - Add support for removing/deleting owner, pet, and tasks.
