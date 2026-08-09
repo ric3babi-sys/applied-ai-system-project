@@ -41,7 +41,9 @@ Steps to setup and run enhanced **PawPal+**:
 1. Clone github project: `https://github.com/ric3babi-sys/applied-ai-system-project.git`
 2. Change directory to where you cloned the project.
 3. Create and activate the virtual environment:
-    - ```bash python -m venv .venv```
+    - ```bash
+      python -m venv .venv
+      ```
     - ```bash source .venv/bin/activate```
 4. Install the requirements:
     - ```bash pip install -r requirements.txt```
