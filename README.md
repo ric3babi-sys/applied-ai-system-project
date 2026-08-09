@@ -44,11 +44,17 @@ Steps to setup and run enhanced **PawPal+**:
     - ```bash
       python -m venv .venv
       ```
-    - ```bash source .venv/bin/activate```
+    - ```bash
+      source .venv/bin/activate
+      ```
 4. Install the requirements:
-    - ```bash pip install -r requirements.txt```
+    - ```bash
+      pip install -r requirements.txt
+      ```
 5. Launch the Streamlit app:
-    - ```bash python -m streamlit run app.py```
+    - ```bash
+      python -m streamlit run app.py
+      ```
 6. Open the browser when Streamlit gives you the local URL, usually:
     - `http://localhost:8501`
 
